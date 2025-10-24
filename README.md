@@ -4,6 +4,8 @@
 
 CPM is a Python-based package manager and runtime for Model Context Protocol (MCP) servers. Manage global and project-level MCP servers with dual-context configuration, just like npm.
 
+⚠️ **STATUS: EARLY DEVELOPMENT** - Registry functionality is not yet released. The tool is currently not functional for package installation and management. Check back for updates.
+
 ## Quick Start
 
 ```bash

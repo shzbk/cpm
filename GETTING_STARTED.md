@@ -1,5 +1,7 @@
 # Getting Started with CPM
 
+⚠️ **NOTE:** CPM is in early development. The registry is not yet live, and the tool is currently not functional for actual package installation and management. This documentation reflects the intended design once the registry launches.
+
 ## Installation
 
 ```bash
