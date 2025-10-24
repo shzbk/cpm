@@ -1,95 +1,110 @@
 # CPM - Context Protocol Manager
 
-> The npm for MCP servers
+> The npm-inspired package manager for MCP servers
 
-CPM is a streamlined package manager and runtime for Model Context Protocol (MCP) servers. Install, manage, and run MCP servers with the simplicity developers expect from npm.
+CPM is a Python-based package manager and runtime for Model Context Protocol (MCP) servers. Manage global and project-level MCP servers with dual-context configuration, just like npm.
 
 ## Quick Start
 
 ```bash
-# Install CPM
-curl -sSL https://cpm.dev/install | bash
+# Install CPM (development)
+cd cpmanager
+uv venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+uv pip install -e .
 
-# Install an MCP server
+# Install an MCP server globally
 cpm install brave-search
 
 # Run it
 cpm run brave-search
 
 # Add to your client (Claude Desktop, Cursor, etc.)
-cpm client add claude-desktop brave-search
+cpm add brave-search --to claude
 ```
 
 ## Features
 
-- 🚀 **Simple Installation** - Install servers from the registry with one command
-- 🔍 **Easy Discovery** - Search and explore available MCP servers
-- 🎯 **Client Integration** - Auto-detect and configure all major MCP clients
-- 📦 **Profile Management** - Organize servers into reusable profiles
-- 🌐 **Multiple Modes** - Run servers in stdio, HTTP, or SSE mode
-- 🔄 **Cross-Platform** - Works on Windows, macOS, and Linux
+- 🌍 **Dual-Context Configuration** - Global (`~/.config/cpm/servers.json`) and project-level (`server.json`)
+- 🔍 **Registry Integration** - Search and install servers from the MCP registry with caching
+- 🎯 **Multi-Client Support** - Auto-detect and configure Claude Desktop, Cursor, Windsurf, VSCode, Cline, Continue, Goose
+- 📦 **Group Management** - Organize servers with `@group` syntax for bulk operations
+- 🚀 **Multiple Execution Modes** - Run servers in stdio (default), HTTP, or SSE mode
+- 🔄 **Cross-Platform** - Windows, macOS, and Linux support
 
 ## Installation
 
-### Recommended: Install Script
+### Development (From Source)
 
 ```bash
-curl -sSL https://cpm.dev/install | bash
+# Clone the repository
+git clone https://github.com/shzbk/cpmanager.git
+cd cpmanager
+
+# Create and activate virtual environment
+uv venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install in editable mode
+uv pip install -e .
+
+# Verify installation
+cpm --version
 ```
 
-### Using uv
+### Production (Coming Soon)
 
-```bash
-uv tool install cpm
-```
-
-### Using pipx
-
-```bash
-pipx install cpm
-```
+PyPI package and install script coming in future releases.
 
 ## Command Reference
 
-### Core Commands
+See [COMMANDS.md](COMMANDS.md) for the full command reference.
+
+### Server Management
 
 ```bash
 # Install & manage servers
-cpm install <server-name>          # Install from registry
-cpm uninstall <server-name>        # Remove server
+cpm install <name>                 # Install server globally
+cpm install <name> --local         # Install to project (server.json)
+cpm uninstall <name>               # Remove server
 cpm ls                             # List installed servers
 cpm search <query>                 # Search registry
-cpm info <server-name>             # Show server details
-
-# Run servers
-cpm run <server-name>              # Run in stdio mode (default)
-cpm run <server-name> --http       # Run in HTTP mode
-cpm run <server-name> --sse        # Run in SSE mode
+cpm info <name>                    # Show server details
+cpm update <name>                  # Update server
+cpm outdated                       # Check for updates
 ```
 
-### Profile Management
+### Running Servers
 
 ```bash
-# Create and manage profiles
-cpm profile create <name>              # Create new profile
-cpm profile add <profile> <server>     # Add server to profile
-cpm profile remove <profile> <server>  # Remove server from profile
-cpm profile list                       # List all profiles
+# Execute servers
+cpm run <name>                     # Run in stdio mode (default)
+cpm run <name> --http              # Run in HTTP mode
+cpm run <name> --sse               # Run in SSE mode
+cpm run @group                     # Run all servers in a group
+cpm serve                          # Alias for 'cpm run --http'
+```
 
-# Run profiles
-cpm profile run <name>                 # Run all servers in profile
-cpm profile run <name> --http          # Aggregate as HTTP endpoint
+### Group Management
+
+```bash
+# Organize with groups (@ prefix)
+cpm group create @name             # Create new group
+cpm group add @name <server>       # Add server to group
+cpm group remove @name <server>    # Remove from group
+cpm group list                     # List all groups
+cpm group show @name               # Show servers in group
 ```
 
 ### Client Integration
 
 ```bash
 # Manage client configurations
-cpm client list                        # Show all supported clients
-cpm client detect                      # Detect installed clients
-cpm client add <client> <server>       # Add server to client config
-cpm client remove <client> <server>    # Remove from client config
-cpm client sync <client>               # Sync all servers to client
+cpm add <name>                     # Add server to all detected clients
+cpm add <name> --to claude         # Add to specific client
+cpm remove <name>                  # Remove from clients
+cpm sync                           # Sync to all clients
+cpm reset <client>                 # Reset client config
+cpm clients                        # Show supported clients
 ```
 
 ## Supported Clients
@@ -104,90 +119,159 @@ cpm client sync <client>               # Sync all servers to client
 
 ## Example Workflows
 
-### 1. Basic Server Installation
+### 1. Global Server Installation
 
 ```bash
 # Search for a server
-cpm search "web search"
+cpm search "brave"
 
-# Install it
+# Install it globally
 cpm install brave-search
 
 # Configure API key
-export BRAVE_API_KEY="your-key"
+export BRAVE_API_KEY="your-api-key"
 
-# Run it
+# Test it
 cpm run brave-search
 ```
 
-### 2. Client Integration
+### 2. Add to MCP Clients
 
 ```bash
 # Install multiple servers
 cpm install brave-search
 cpm install filesystem
 
-# Add them to Claude Desktop
-cpm client add claude-desktop brave-search
-cpm client add claude-desktop filesystem
+# Add to Claude Desktop (auto-detects)
+cpm add brave-search
+cpm add filesystem
 
-# Restart Claude Desktop - servers are ready!
+# Or add to specific client
+cpm add brave-search --to cursor
+cpm add brave-search --to windsurf
+
+# Restart your client - servers are ready!
 ```
 
-### 3. Profile-Based Organization
+### 3. Project-Level Setup
 
 ```bash
-# Create a web development profile
-cpm profile create web-dev
+# Initialize project with servers
+cpm init my-project
+cd my-project
 
-# Add relevant servers
-cpm profile add web-dev brave-search
-cpm profile add web-dev fetch
-cpm profile add web-dev filesystem
+# Install project-specific servers
+cpm install brave-search --local
+cpm install filesystem --local
 
-# Run all servers as one HTTP endpoint
-cpm profile run web-dev --http --port 8080
+# Create groups for organization
+cpm group create @research
+cpm group add @research brave-search
+
+# Run all research servers
+cpm run @research --http
+```
+
+### 4. Group-Based Organization
+
+```bash
+# Create groups
+cpm group create @database
+cpm group create @ai-tools
+
+# Add servers to groups
+cpm group add @database mysql postgres
+cpm group add @ai-tools brave-search embedding-model
+
+# Run group as HTTP endpoint
+cpm run @database --http
+cpm run @ai-tools --http --port 8081
 ```
 
 ## Configuration
 
-CPM stores configuration in `~/.config/cpm/`:
+### Global Configuration
 
-- `servers.json` - Installed servers and profiles
-- `cache/` - Registry cache
+CPM stores global configuration in `~/.config/cpm/`:
+
+- **`servers.json`** - Globally installed servers and groups
+- **`cache/registry.json`** - Cached registry data (1 hour TTL)
+
+### Project Configuration
+
+CPM supports project-level `server.json` for project-specific servers:
+
+- **`server.json`** - Project manifest (name, version, servers, devServers, groups)
+- **`server-lock.json`** - Lock file with pinned versions and integrity hashes
+- **`.cpm/`** - Local CPM directory with server configs
+
+### Context Detection
+
+CPM auto-detects context:
+- If `server.json` exists in current directory → **local context**
+- Otherwise → **global context** (`~/.config/cpm/`)
+- Override with `--local` or `--global` flags
 
 ## Development
 
 ### Setup
 
 ```bash
-git clone https://github.com/yourusername/cpm.git
-cd cpm
+# Clone the repository
+git clone https://github.com/shzbk/cpmanager.git
+cd cpmanager
 
-# Create virtual environment
+# Create and activate virtual environment
 uv venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
-# Install in development mode
-uv pip install -e .
+# Install dependencies and CPM in editable mode
+uv pip install -e ".[dev]"
 
 # Run tests
 pytest
+
+# Check code formatting
+ruff format src/ tests/
+ruff check src/ tests/
 ```
 
 ### Project Structure
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
+
 ```
-cpm/
+cpmanager/
 ├── src/cpm/
-│   ├── cli.py              # Main CLI entry point
-│   ├── core/               # Core logic (config, schema, registry)
-│   ├── clients/            # Client managers
-│   ├── runtime/            # Server execution
-│   ├── commands/           # CLI commands
-│   └── utils/              # Utilities
-├── tests/                  # Test suite
-└── pyproject.toml          # Project configuration
+│   ├── cli.py                      # Main CLI entry point (Click)
+│   ├── core/
+│   │   ├── config.py               # GlobalConfigManager
+│   │   ├── local_config.py         # LocalConfigManager
+│   │   ├── context.py              # ConfigContext (unified interface)
+│   │   ├── schema.py               # Pydantic models
+│   │   ├── registry.py             # RegistryClient
+│   │   └── lockfile.py             # Lock file management
+│   ├── clients/
+│   │   ├── base.py                 # BaseClientManager interface
+│   │   ├── registry.py             # ClientRegistry
+│   │   └── managers/               # Platform-specific managers
+│   │       ├── claude_desktop.py   # Claude Desktop
+│   │       ├── cursor.py           # Cursor
+│   │       ├── windsurf.py         # Windsurf
+│   │       ├── vscode.py           # VSCode
+│   │       ├── cline.py            # Cline
+│   │       ├── continue_ext.py     # Continue
+│   │       └── goose.py            # Goose
+│   ├── commands/                   # ~25 CLI commands
+│   ├── runtime/
+│   │   └── executor.py             # ServerExecutor (FastMCP)
+│   ├── ui/                         # TUI components
+│   └── utils/                      # Shared utilities
+├── tests/                          # Test suite
+├── ARCHITECTURE.md                 # Architecture documentation
+├── COMMANDS.md                     # Command reference
+├── README.md                       # This file
+└── pyproject.toml                  # Project config
 ```
 
 ## Contributing
