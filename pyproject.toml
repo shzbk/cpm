@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cpm"
+version = "0.1.0"
+description = "CPM - Context Protocol Manager. The npm for MCP servers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "CPM Contributors" }
+]
+keywords = [
+    "CPM",
+    "MCP",
+    "Model Context Protocol",
+    "Claude",
+    "AI",
+]
+dependencies = [
+    "click>=8.1.3",
+    "rich>=13.0.0",
+    "rich-click>=1.8.0",
+    "requests>=2.31.0",
+    "pydantic>=2.5.0",
+    "fastmcp>=2.10.0",
+    "mcp>=1.8.0",
+    "ruamel-yaml>=0.18.0",
+    "questionary>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/cpm"
+Repository = "https://github.com/yourusername/cpm"
+Issues = "https://github.com/yourusername/cpm/issues"
+
+[project.scripts]
+cpm = "cpm.cli:main"
+
+[tool.hatch.version]
+path = "src/cpm/__init__.py"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+fix = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+fixable = ["ALL"]
+ignore = ["E501"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "ipython>=8.0.0",
+]
