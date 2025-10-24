@@ -53,3 +53,7 @@ ARCHITECTURE.md
 Plan.md
 COMMANDS.md
 CONTRIBUTING.md
+
+# Development scripts
+cpm-dev.bat
+cpm-dev.sh
