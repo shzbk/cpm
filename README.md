@@ -57,8 +57,6 @@ PyPI package and install script coming in future releases.
 
 ## Command Reference
 
-See [COMMANDS.md](COMMANDS.md) for the full command reference.
-
 ### Server Management
 
 ```bash
@@ -238,8 +236,6 @@ ruff check src/ tests/
 
 ### Project Structure
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
-
 ```
 cpmanager/
 ├── src/cpm/
@@ -268,15 +264,10 @@ cpmanager/
 │   ├── ui/                         # TUI components
 │   └── utils/                      # Shared utilities
 ├── tests/                          # Test suite
-├── ARCHITECTURE.md                 # Architecture documentation
-├── COMMANDS.md                     # Command reference
 ├── README.md                       # This file
+├── LICENSE                         # MIT License
 └── pyproject.toml                  # Project config
 ```
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 
