@@ -4,67 +4,86 @@ Info command - Show detailed server information
 
 import click
 from rich.console import Console
-from rich.panel import Panel
 
-from cpm.core import RegistryClient
+from cpm.core.registry import RegistryClient
+from cpm.core.resolver import ServerNameResolver
 
 console = Console()
-registry = RegistryClient()
 
 
 @click.command()
 @click.argument("server_name")
 def info(server_name: str):
     """
-    Show detailed information about a server
+    Show detailed information about a server.
 
     Examples:
 
-        cpm info brave-search
-        cpm info filesystem
+        \b
+        cpm info io.github.user/mysql
+        cpm info mysql                    # Auto-resolves simple name
     """
-    # Get server from registry
-    server = registry.get_server(server_name)
 
-    if not server:
-        console.print(f"[bold red]Error:[/] Server '{server_name}' not found in registry")
-        return
+    registry = RegistryClient()
+    resolver = ServerNameResolver(registry)
 
-    # Display server info
-    display_name = server.get("display_name", server_name)
-    description = server.get("description", "No description available")
-    author = server.get("author", {})
-    tags = server.get("tags", [])
-    categories = server.get("categories", [])
+    try:
+        console.print(f"[cyan]Looking up:[/] {server_name}")
 
-    # Build info panel
-    info_text = f"[bold]{display_name}[/]\n\n"
-    info_text += f"{description}\n\n"
+        # Resolve name if simple
+        full_name = resolver.resolve(server_name)
 
-    if author:
-        author_name = author.get("name", "Unknown")
-        author_url = author.get("url", "")
-        info_text += f"[dim]Author:[/] {author_name}"
-        if author_url:
-            info_text += f" ({author_url})"
-        info_text += "\n"
+        # Get server
+        server = registry.get_server(full_name)
 
-    if tags:
-        info_text += f"[dim]Tags:[/] {', '.join(tags)}\n"
+        # Show details
+        console.print(f"\n[bold cyan]{server.name}[/bold cyan] v{server.version}\n")
 
-    if categories:
-        info_text += f"[dim]Categories:[/] {', '.join(categories)}\n"
+        console.print(f"[yellow]Description:[/]")
+        console.print(f"  {server.description}\n")
 
-    panel = Panel(info_text, title="Server Information", border_style="cyan")
-    console.print(panel)
+        if server.title:
+            console.print(f"[yellow]Title:[/] {server.title}\n")
 
-    # Show installation info
-    installations = server.get("installations", {})
-    if installations:
-        console.print("\n[bold]Installation Methods:[/]")
-        for key, method in installations.items():
-            method_type = method.get("type", "unknown")
-            recommended = " [green](recommended)[/]" if method.get("recommended") else ""
-            console.print(f"  * {key}: [dim]{method_type}[/]{recommended}")
+        if server.websiteUrl:
+            console.print(f"[yellow]Website:[/] {server.websiteUrl}\n")
 
-    console.print(f"\n[dim]Install:[/] [cyan]cpm install {server_name}[/]")
+        # Repository info
+        if server.repository:
+            console.print(f"[yellow]Repository:[/]")
+            console.print(f"  {server.repository.source}: {server.repository.url}")
+            if server.repository.subfolder:
+                console.print(f"  Subfolder: {server.repository.subfolder}\n")
+            else:
+                console.print()
+
+        # Packages
+        if server.packages:
+            console.print(f"[yellow]Installation Methods:[/]")
+            for i, pkg in enumerate(server.packages, 1):
+                console.print(
+                    f"  {i}. {pkg.registryType.upper()}: {pkg.identifier}"
+                )
+                console.print(f"     Transport: {pkg.transport.type}")
+                if pkg.environmentVariables:
+                    console.print(f"     Environment variables:")
+                    for env_var in pkg.environmentVariables:
+                        required = " (required)" if env_var.isRequired else ""
+                        console.print(f"       • {env_var.name}{required}")
+            console.print()
+
+        # Remotes
+        if server.remotes:
+            console.print(f"[yellow]Remote Endpoints:[/]")
+            for remote in server.remotes:
+                console.print(f"  • {remote.type}: {remote.url}\n")
+
+        # Install command
+        console.print(f"[green]Install:[/]")
+        console.print(f"  [cyan]cpm install {server_name}[/cyan]\n")
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/] {e}")
+    except Exception as e:
+        console.print(f"[red]Error:[/] {e}")
+        raise click.Abort()

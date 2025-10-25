@@ -11,13 +11,14 @@ from typing import Dict, List, Optional
 
 from pydantic import TypeAdapter
 
-from .schema import GroupMetadata, ServerConfig
+from .schema import CPMRuntimeConfig, GroupMetadata, ServerConfig, ServerLockfile
 
 logger = logging.getLogger(__name__)
 
 # Default configuration paths
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "cpm"
 DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "servers.json"
+DEFAULT_LOCKFILE = DEFAULT_CONFIG_DIR / "servers-lock.json"
 
 
 class GlobalConfigManager:
@@ -28,13 +29,16 @@ class GlobalConfigManager:
     Groups organize servers via tagging.
     """
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Optional[Path] = None, lockfile_path: Optional[Path] = None):
         self.config_path = config_path or DEFAULT_CONFIG_FILE
+        self.lockfile_path = lockfile_path or DEFAULT_LOCKFILE
         self.config_dir = self.config_path.parent
         self._servers: Dict[str, ServerConfig] = {}
         self._groups: Dict[str, GroupMetadata] = {}
+        self._lockfile: Optional[ServerLockfile] = None
         self._ensure_config_dir()
         self._load_config()
+        self._load_lockfile()
 
     def _ensure_config_dir(self) -> None:
         """Ensure configuration directory exists"""
@@ -50,11 +54,16 @@ class GlobalConfigManager:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Load servers
+            # Load servers (may be ServerConfig or CPMRuntimeConfig)
             servers_data = data.get("servers", {})
             for name, config_data in servers_data.items():
                 try:
-                    self._servers[name] = TypeAdapter(ServerConfig).validate_python(config_data)
+                    # Try CPMRuntimeConfig first (has more fields)
+                    try:
+                        self._servers[name] = CPMRuntimeConfig.model_validate(config_data)
+                    except Exception:
+                        # Fall back to ServerConfig
+                        self._servers[name] = TypeAdapter(ServerConfig).validate_python(config_data)
                 except Exception as e:
                     logger.error(f"Error loading server {name}: {e}")
 
@@ -89,10 +98,68 @@ class GlobalConfigManager:
             logger.error(f"Error saving config: {e}")
             return False
 
+    def _load_lockfile(self) -> None:
+        """Load lockfile from file"""
+        if not self.lockfile_path.exists():
+            logger.debug(f"Lockfile not found: {self.lockfile_path}")
+            self._lockfile = ServerLockfile()
+            return
+
+        try:
+            with open(self.lockfile_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._lockfile = ServerLockfile.model_validate(data)
+        except Exception as e:
+            logger.error(f"Error loading lockfile: {e}")
+            self._lockfile = ServerLockfile()
+
+    def _save_lockfile(self) -> bool:
+        """Save lockfile to file"""
+        if not self._lockfile:
+            self._lockfile = ServerLockfile()
+
+        try:
+            self._ensure_config_dir()
+            with open(self.lockfile_path, "w", encoding="utf-8") as f:
+                json.dump(self._lockfile.model_dump(), f, indent=2)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving lockfile: {e}")
+            return False
+
+    def add_to_lockfile(self, server_name: str, entry) -> bool:
+        """Add server entry to lockfile"""
+        if not self._lockfile:
+            self._lockfile = ServerLockfile()
+        self._lockfile.servers[server_name] = entry
+        return self._save_lockfile()
+
+    def get_lockfile(self) -> ServerLockfile:
+        """Get the lockfile"""
+        if not self._lockfile:
+            self._lockfile = ServerLockfile()
+        return self._lockfile
+
+    def load_lockfile(self) -> ServerLockfile:
+        """Load and return the lockfile"""
+        if not self._lockfile:
+            self._load_lockfile()
+        if not self._lockfile:
+            self._lockfile = ServerLockfile()
+        return self._lockfile
+
+    def save_lockfile(self, lockfile: ServerLockfile) -> bool:
+        """Save a lockfile"""
+        self._lockfile = lockfile
+        return self._save_lockfile()
+
     # ===== Server Management =====
 
-    def add_server(self, server: ServerConfig, force: bool = False) -> bool:
-        """Add a server to global configuration"""
+    def add_server(self, server, force: bool = False) -> bool:
+        """Add a server to global configuration (ServerConfig or CPMRuntimeConfig)"""
+        if not hasattr(server, 'name'):
+            raise ValueError("Server must have a 'name' attribute")
+
         if server.name in self._servers and not force:
             logger.warning(f"Server '{server.name}' already exists")
             return False

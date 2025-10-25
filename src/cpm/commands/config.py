@@ -31,26 +31,34 @@ from cpm.core.registry import RegistryClient
 console = Console()
 
 
-@click.group()
+@click.group(invoke_without_command=True)
+@click.argument("server", required=False)
+@click.option("-c", "--code", "use_code_editor", is_flag=True, help="Open in system code editor")
 @click.option("-g", "--global", "use_global", is_flag=True, help="Use global config")
 @click.option("-l", "--local", "use_local", is_flag=True, help="Use local config")
 @click.option("--editor", help="Specify editor to use")
 @click.option("--json", "output_json", is_flag=True, help="JSON output format")
 @click.option("--long", "show_long", is_flag=True, help="Show full values (don't mask)")
 @click.pass_context
-def config(ctx, use_global, use_local, editor, output_json, show_long):
+def config(ctx, server, use_code_editor, use_global, use_local, editor, output_json, show_long):
     """
     Manage CPM server configuration
 
+    Usage:
+      cpm config <server>                      # Interactive editor
+      cpm config <server> -c                   # Open in code editor
+    
     Subcommands:
       set      Set environment variables
       get      Get environment variable values
       delete   Delete environment variables
       list     List all configurations
-      edit     Open configuration in editor
+      edit     Open configuration in text editor
 
     Examples:
 
+        cpm config mysql                       # Interactive menu
+        cpm config mysql -c                    # Open in code editor
         cpm config set mysql MYSQL_HOST=localhost MYSQL_USER=root
         cpm config get mysql MYSQL_HOST
         cpm config delete mysql MYSQL_PASSWORD
@@ -64,6 +72,26 @@ def config(ctx, use_global, use_local, editor, output_json, show_long):
     ctx.obj["editor"] = editor
     ctx.obj["output_json"] = output_json
     ctx.obj["show_long"] = show_long
+    
+    # Handle direct invocation with server name
+    if ctx.invoked_subcommand is None:
+        if server:
+            config_ctx = _get_config_context(ctx)
+            try:
+                server_config = config_ctx.get_server(server)
+            except KeyError:
+                console.print(f"[red]Error:[/] Server '{server}' not found")
+                raise click.Abort()
+            
+            if use_code_editor:
+                # Open in code editor
+                _handle_code_editor(server, server_config, config_ctx, editor)
+            else:
+                # Interactive menu
+                _handle_interactive(server, server_config, config_ctx)
+        else:
+            console.print("[yellow]Usage:[/] cpm config <server> [options]")
+            console.print("[dim]Use -c flag to open in code editor[/]")
 
 
 # ============================================================================
@@ -216,20 +244,21 @@ def _set_variables(server: str, key_values: tuple, config_ctx: ConfigContext, ct
         key = key.strip()
         value = value.strip()
 
-        # Case-insensitive match
+        # Case-insensitive match for existing variables
         matched = False
         for env_key in list(env_vars.keys()):
             if env_key.upper() == key.upper():
                 env_vars[env_key] = value
                 matched = True
                 updated_count += 1
-                console.print(f"[green]+[/] {env_key} = {value if 'password' not in env_key.lower() else '****'}")
+                console.print(f"[green]+[/] {env_key} = {value}")
                 break
 
+        # Allow adding new variables if not found
         if not matched:
-            console.print(f"[red]-[/] Variable '{key}' not found")
-            console.print(f"[dim]Available:[/] {', '.join(env_vars.keys())}")
-            raise click.Abort()
+            env_vars[key] = value
+            updated_count += 1
+            console.print(f"[green]+[/] {key} = {value} (new)")
 
     if updated_count > 0:
         config_ctx.update_server_config(server, env_vars)
@@ -275,13 +304,13 @@ def _get_variables(server: str, keys: tuple, config_ctx: ConfigContext, ctx):
         table.add_column("Value", style="dim")
 
         for var_name, value in env_vars.items():
-            if show_long or (not isinstance(value, str) or not value.startswith("${")):
-                if any(k in var_name.lower() for k in ["password", "secret", "token", "key"]) and not show_long:
-                    display_value = "****"
-                else:
-                    display_value = value
-            else:
+            # Show actual value - users need to verify their secrets are correct
+            if isinstance(value, str) and value.startswith("${"):
+                # Not configured - show placeholder
                 display_value = "[red]not configured[/]"
+            else:
+                # Show the actual value
+                display_value = value
             table.add_row(var_name, display_value)
 
         console.print(table)
@@ -649,6 +678,58 @@ def _handle_reset(server: str, server_config, config_ctx: ConfigContext):
 
     console.print(f"[green]+ Configuration reset to defaults![/]")
     _handle_view(server, original_env)
+
+
+def _handle_code_editor(server: str, server_config, config_ctx: ConfigContext, editor_cmd: str = None):
+    """Open server config in code editor"""
+    import json
+    import platform
+    
+    # Get current env vars
+    env_vars = server_config.env.copy()
+    
+    # Create temp file with env vars as JSON
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(env_vars, f, indent=2)
+        temp_file = f.name
+    
+    try:
+        # Determine editor command
+        if editor_cmd:
+            cmd = editor_cmd
+        else:
+            # Use system default editor
+            system = platform.system()
+            if system == "Windows":
+                cmd = f"notepad {temp_file}"
+            elif system == "Darwin":  # macOS
+                cmd = f"open -a TextEdit {temp_file}"
+            else:  # Linux
+                cmd = f"xdg-open {temp_file}"
+        
+        console.print(f"[cyan]Opening {server} config in editor...[/]")
+        
+        # Open editor
+        os.system(cmd)
+        
+        # Read back the file
+        with open(temp_file, 'r') as f:
+            updated_vars = json.load(f)
+        
+        # Check if anything changed
+        if updated_vars != env_vars:
+            config_ctx.update_server_config(server, updated_vars)
+            console.print("[green]+ Configuration saved![/]")
+        else:
+            console.print("[dim]No changes made[/]")
+    
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(temp_file)
+        except:
+            pass
 
 
 def _handle_interactive(server: str, server_config, config_ctx: ConfigContext):

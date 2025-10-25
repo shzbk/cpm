@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ValidationError
 
-from cpm.core.schema import ServerConfig, STDIOServerConfig, RemoteServerConfig
+from cpm.core.schema import ServerConfig, STDIOServerConfig, RemoteServerConfig, ServerLockfile
 
 logger = logging.getLogger(__name__)
 
@@ -168,13 +168,17 @@ class LocalConfigManager:
         # Ensure config directory exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        config_file = self.config_dir / f"{name}.json"
+        # Sanitize filename - replace / with _ for reverse-DNS names
+        safe_name = name.replace("/", "_").replace("\\", "_")
+        config_file = self.config_dir / f"{safe_name}.json"
         with open(config_file, "w") as f:
             json.dump(server_config.model_dump(), f, indent=2)
 
     def get_server(self, name: str) -> ServerConfig:
         """Get server configuration"""
-        config_file = self.config_dir / f"{name}.json"
+        # Sanitize filename - replace / with _ for reverse-DNS names
+        safe_name = name.replace("/", "_").replace("\\", "_")
+        config_file = self.config_dir / f"{safe_name}.json"
         if not config_file.exists():
             raise KeyError(f"Server not found: {name}")
 
@@ -196,7 +200,19 @@ class LocalConfigManager:
 
         for name in list(manifest.servers.keys()) + list(manifest.devServers.keys()):
             try:
-                servers[name] = self.get_server(name)
+                safe_name = name.replace("/", "_").replace("\\", "_")
+                config_file = self.config_dir / f"{safe_name}.json"
+                if config_file.exists():
+                    with open(config_file, "r") as f:
+                        data = json.load(f)
+                    if "command" in data:
+                        servers[name] = STDIOServerConfig(**data)
+                    elif "url" in data:
+                        servers[name] = RemoteServerConfig(**data)
+                    else:
+                        logger.warning(f"Invalid server config for {name}")
+                else:
+                    logger.warning(f"Server config not found for {name}")
             except Exception as e:
                 logger.warning(f"Failed to load server {name}: {e}")
 
@@ -371,3 +387,29 @@ class LocalConfigManager:
         """Check if group exists"""
         manifest = self.load_manifest()
         return name in manifest.groups
+
+    # Lockfile operations
+    def load_lockfile(self) -> ServerLockfile:
+        """Load server-lock.json"""
+        if not self.lock_file.exists():
+            logger.debug(f"Lockfile not found: {self.lock_file}")
+            return ServerLockfile()
+
+        try:
+            with open(self.lock_file, "r") as f:
+                data = json.load(f)
+            return ServerLockfile.model_validate(data)
+        except Exception as e:
+            logger.error(f"Error loading lockfile: {e}")
+            return ServerLockfile()
+
+    def save_lockfile(self, lockfile: ServerLockfile) -> bool:
+        """Save server-lock.json"""
+        try:
+            with open(self.lock_file, "w") as f:
+                json.dump(lockfile.model_dump(), f, indent=2)
+            logger.debug(f"Saved lockfile: {self.lock_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving lockfile: {e}")
+            return False

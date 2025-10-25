@@ -1,5 +1,5 @@
 """
-Install command - Install servers from MCP Official Registry
+Install command v2 - Install servers from MCP Official Registry
 
 Uses new architecture:
 - ServerNameResolver: Maps simple names to registry names
@@ -10,12 +10,13 @@ Uses new architecture:
 
 import click
 from rich.console import Console
+from rich.table import Table
 
 from cpm.core.adapter import ServerConfigAdapter
 from cpm.core.context import ConfigContext
-from cpm.core.registry import RegistryClient
+from cpm.core.registry_v2 import RegistryClient
 from cpm.core.resolver import ServerNameResolver
-from cpm.core.schema import ServerLockEntry, ServerLockfile
+from cpm.core.schema import ServerLockEntry, ServerLockfile, ServerManifest
 
 console = Console()
 
@@ -208,7 +209,7 @@ def _install_single_server(
         )
 
         # Add to config
-        config.add_server(install_name, runtime_config, dev=save_dev, force=force)
+        config.add_server(install_name, runtime_config, dev=save_dev)
 
         # Update lockfile
         lockfile = config.manager.load_lockfile()

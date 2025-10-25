@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import TypeAdapter
 from ruamel.yaml import YAML
 
-from cpm.core.schema import ServerConfig, STDIOServerConfig
+from cpm.core.schema import ServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -175,15 +175,24 @@ class JSONClientManager(BaseClientManager):
 
     def to_client_format(self, server_config: ServerConfig) -> Dict[str, Any]:
         """Convert ServerConfig to client format"""
-        if isinstance(server_config, STDIOServerConfig):
+        # Handle CPMRuntimeConfig with command (STDIO) or url (Remote)
+        if hasattr(server_config, 'command') and server_config.command:
+            # STDIO-based server
             result = {
                 "command": server_config.command,
-                "args": server_config.args,
+                "args": server_config.args or [],
             }
             if server_config.env:
                 result["env"] = {k: v for k, v in server_config.env.items() if v}
             return result
+        elif hasattr(server_config, 'url') and server_config.url:
+            # Remote-based server
+            return {
+                "url": server_config.url,
+                "headers": server_config.headers or {},
+            }
         else:
+            # Fallback: dump entire config
             return server_config.model_dump()
 
     @classmethod
@@ -308,15 +317,24 @@ class YAMLClientManager(BaseClientManager):
 
     def to_client_format(self, server_config: ServerConfig) -> Dict[str, Any]:
         """Convert ServerConfig to client format"""
-        if isinstance(server_config, STDIOServerConfig):
+        # Handle CPMRuntimeConfig with command (STDIO) or url (Remote)
+        if hasattr(server_config, 'command') and server_config.command:
+            # STDIO-based server
             result = {
                 "command": server_config.command,
-                "args": server_config.args,
+                "args": server_config.args or [],
             }
             if server_config.env:
                 result["env"] = {k: v for k, v in server_config.env.items() if v}
             return result
+        elif hasattr(server_config, 'url') and server_config.url:
+            # Remote-based server
+            return {
+                "url": server_config.url,
+                "headers": server_config.headers or {},
+            }
         else:
+            # Fallback: dump entire config
             return server_config.model_dump()
 
     @classmethod

@@ -1,7 +1,13 @@
 """
-Initialize command - Create MCP-compliant projects
+Initialize command v2 - Create MCP-compliant projects
 
-Creates proper server.json following MCP official registry standards.
+Replaces old init command with one that creates proper server.json
+following MCP official registry standards.
+
+Creates:
+  server.json - Project manifest (like package.json)
+  server-lock.json - Lockfile with pinned versions
+  .cpmrc (optional) - Project-specific CPM configuration
 """
 
 import json
@@ -142,3 +148,16 @@ __pycache__/
             import shutil
             shutil.rmtree(project_path)
         raise click.Abort()
+
+
+# Optional: cpm init --template command for future templates
+@click.command()
+def list_templates():
+    """List available project templates (future feature)."""
+
+    console.print("[yellow]Available templates:[/]\n")
+    console.print("  [cyan]basic[/]          - Minimal MCP project")
+    console.print("  [cyan]web-search[/]     - With web search servers")
+    console.print("  [cyan]data-tools[/]     - With database/data tools")
+    console.print("  [cyan]ai-agent[/]       - Full AI agent setup")
+    console.print("\n[dim]Run:[/] cpm init my-project --template <template>")

@@ -76,12 +76,16 @@ class ConfigContext:
     # Unified server operations
     def add_server(self, name: str, server_config: ServerConfig, **kwargs):
         """Add server to context"""
+        force = kwargs.get("force", False)
         if self.is_local:
             version = kwargs.get("version", "latest")
             dev = kwargs.get("dev", False)
             self.manager.add_server(name, version, server_config, dev)
         else:
-            self.manager.add_server(server_config)
+            # For global config, ensure server has the name field set
+            if not hasattr(server_config, 'name') or server_config.name != name:
+                server_config.name = name
+            self.manager.add_server(server_config, force=force)
 
     def remove_server(self, name: str):
         """Remove server from context"""

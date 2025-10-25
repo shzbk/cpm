@@ -9,7 +9,7 @@ from fastmcp import FastMCP
 from rich.console import Console
 from rich.panel import Panel
 
-from cpm.core.schema import ServerConfig
+from cpm.core.schema import RemoteServerConfig, ServerConfig, STDIOServerConfig
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -67,58 +67,6 @@ class ServerExecutor:
             show_banner=False,
         )
 
-    async def run_aggregated_stdio(self, servers: list) -> None:
-        """Run multiple servers aggregated via stdio"""
-        # Create proxies for all servers
-        proxies = []
-        for server in servers:
-            proxy = await self._create_proxy(server)
-            proxies.append(proxy)
-
-        # Run first proxy as main (others will be connected)
-        if proxies:
-            await proxies[0].run_stdio_async(show_banner=False)
-
-    async def run_aggregated_http(
-        self,
-        servers: list,
-        port: int = 6276,
-        host: str = "127.0.0.1",
-        sse: bool = False,
-    ) -> None:
-        """Run multiple servers aggregated via HTTP"""
-        # Create proxies for all servers
-        proxies = []
-        for server in servers:
-            proxy = await self._create_proxy(server)
-            proxies.append(proxy)
-
-        # Run first proxy as main
-        if proxies:
-            mode = "SSE" if sse else "HTTP"
-            url = f"http://{host}:{port}/"
-            transport = "sse" if sse else "http"
-
-            panel_content = f"[bold]Aggregated {len(proxies)} servers[/]\n"
-            for server in servers:
-                panel_content += f"  * {server.name}\n"
-            panel_content += f"\n[bold]Mode:[/] {mode}\n[bold]URL:[/] [cyan]{url}[/cyan]\n\n[dim]Press Ctrl+C to stop[/]"
-
-            panel = Panel(
-                panel_content,
-                title=f"[*] {mode} Server Running",
-                border_style="green",
-                padding=(1, 2),
-            )
-            console.print(panel)
-
-            await proxies[0].run_http_async(
-                host=host,
-                port=port,
-                transport=transport,
-                show_banner=False,
-            )
-
     async def _create_proxy(self, server: ServerConfig) -> FastMCP:
         """Create FastMCP proxy for a server"""
         try:
@@ -136,25 +84,20 @@ class ServerExecutor:
                 StdioMCPServer,
             )
 
-        # Build MCP config - determine if stdio or remote based on config
-        if hasattr(server, 'command') and server.command:
-            # STDIO mode (package-based execution)
+        # Build MCP config
+        if isinstance(server, STDIOServerConfig):
             mcp_server = StdioMCPServer(
                 command=server.command,
                 args=server.args or [],
                 env=server.env or {},
             )
-        elif hasattr(server, 'url') and server.url:
-            # Remote mode (HTTP/SSE)
+        elif isinstance(server, RemoteServerConfig):
             mcp_server = RemoteMCPServer(
                 url=server.url,
                 headers=server.headers or {},
             )
         else:
-            raise ValueError(
-                f"Server {server.name} has neither command nor url configured. "
-                f"Type: {type(server).__name__}"
-            )
+            raise ValueError(f"Unsupported server type: {type(server)}")
 
         # Create proxy
         config = MCPConfig(mcpServers={server.name: mcp_server})

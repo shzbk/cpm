@@ -1,7 +1,7 @@
 """
-Registry client for MCP Official Registry
+RegistryClient v2 - Client for MCP Official Registry
 
-Fetches servers from: https://registry.modelcontextprotocol.io/v0/servers
+Fetches servers from the official MCP registry at https://registry.modelcontextprotocol.io
 Returns MCPServerConfig objects matching the official schema.
 
 Features:
@@ -9,7 +9,6 @@ Features:
 - Version management
 - Local caching with TTL
 - Graceful fallback to cached data
-- Search support with optional filters
 """
 
 import json
@@ -24,8 +23,7 @@ from cpm.core.schema import MCPServerConfig
 
 logger = logging.getLogger(__name__)
 
-# Official MCP Registry (uses stable v0.1 API for production stability)
-# See: https://registry.modelcontextprotocol.io/docs for interactive API documentation
+# Default configuration for official registry
 DEFAULT_REGISTRY_URL = "https://registry.modelcontextprotocol.io/v0.1/servers"
 DEFAULT_CACHE_DIR = Path.home() / ".config" / "cpm" / "cache"
 DEFAULT_CACHE_FILE = DEFAULT_CACHE_DIR / "official_registry.json"
@@ -75,7 +73,6 @@ class RegistryClient:
         self,
         server_name: str,
         version: Optional[str] = None,
-        include_inactive: bool = False,
     ) -> MCPServerConfig:
         """
         Get a specific server by name.
@@ -83,7 +80,6 @@ class RegistryClient:
         Args:
             server_name: Full reverse-DNS name (io.github.user/server)
             version: Optional specific version (defaults to latest)
-            include_inactive: If False, filters out servers with status != 'active'
 
         Returns:
             MCPServerConfig for the server
@@ -99,13 +95,6 @@ class RegistryClient:
         for server_data in servers:
             server = server_data.get("server", {})
             if server.get("name") == server_name:
-                # Filter by status unless explicitly included
-                if not include_inactive:
-                    meta = server_data.get("_meta", {})
-                    official_meta = meta.get("io.modelcontextprotocol.registry/official", {})
-                    status = official_meta.get("status", "active")
-                    if status != "active":
-                        continue
                 matching_servers.append(server)
 
         if not matching_servers:
@@ -157,22 +146,13 @@ class RegistryClient:
         self,
         query: Optional[str] = None,
         limit: Optional[int] = None,
-        updated_since: Optional[str] = None,
-        version: Optional[str] = None,
     ) -> List[Dict]:
         """
         Search for servers in registry.
 
-        Implements the official registry search parameters:
-        - query: Case-insensitive substring search on server names
-        - updated_since: Filter servers updated after RFC3339 timestamp
-        - version: Filter by version (supports 'latest' only)
-
         Args:
-            query: Search query (matches name, description, title)
+            query: Search query (matches name, description)
             limit: Limit results
-            updated_since: RFC3339 timestamp (e.g., 2025-08-01T00:00:00Z)
-            version: Version filter ('latest' for latest versions only)
 
         Returns:
             List of matching server response dicts
@@ -180,39 +160,27 @@ class RegistryClient:
 
         servers = self.get_servers(limit=limit)
 
-        # Apply filters
+        if not query:
+            return servers
+
+        # Filter by query
+        query_lower = query.lower()
         results = []
+
         for server_data in servers:
             server = server_data.get("server", {})
-            meta = server_data.get("_meta", {})
 
-            # Filter by version (latest only)
-            if version == "latest":
-                official_meta = meta.get("io.modelcontextprotocol.registry/official", {})
-                if not official_meta.get("isLatest", False):
-                    continue
+            # Check fields
+            name = server.get("name", "").lower()
+            description = server.get("description", "").lower()
+            title = server.get("title", "").lower()
 
-            # Filter by updated_since timestamp
-            if updated_since:
-                published_at = official_meta.get("publishedAt", "")
-                if published_at and published_at < updated_since:
-                    continue
-
-            # Filter by query (name, description, title)
-            if query:
-                query_lower = query.lower()
-                name = server.get("name", "").lower()
-                description = server.get("description", "").lower()
-                title = server.get("title", "").lower()
-
-                if not (
-                    query_lower in name
-                    or query_lower in description
-                    or query_lower in title
-                ):
-                    continue
-
-            results.append(server_data)
+            if (
+                query_lower in name
+                or query_lower in description
+                or query_lower in title
+            ):
+                results.append(server_data)
 
         return results
 

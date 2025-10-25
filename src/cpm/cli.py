@@ -29,7 +29,7 @@ cpm <command> -h   quick help on <command>
 All commands:
 
     add, cache, clients, config, group, info, init, install,
-    link, ls, outdated, remove, reset, run, search, serve,
+    link, ls, outdated, publish, remove, reset, run, search, serve,
     settings, sync, uninstall, unlink, update, upgrade, version
 
 Context files:
@@ -149,13 +149,14 @@ main.add_command(group.group)
 # D. DEVELOPER COMMANDS
 # ============================================================================
 
-from cpm.commands import init, update, outdated, link, unlink
+from cpm.commands import init, update, outdated, link, unlink, publish
 
 main.add_command(init.init)
 main.add_command(update.update)
 main.add_command(outdated.outdated)
 main.add_command(link.link)
 main.add_command(unlink.unlink)
+main.add_command(publish.publish)
 
 
 # ============================================================================

@@ -1,7 +1,7 @@
 """
-Search command - Search official MCP registry
+Search command v2 - Search official MCP registry
 
-Uses new RegistryClient to search across official registry.
+Uses new RegistryClient v2 to search across official registry.
 Shows reverse-DNS names and helps users find servers.
 """
 
@@ -9,10 +9,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from cpm.core.registry import RegistryClient
-from cpm.core.resolver import ServerNameResolver
+from cpm.core.registry_v2 import RegistryClient
 
-console = Console(legacy_windows=False)
+console = Console()
 
 
 @click.command()
@@ -28,6 +27,12 @@ console = Console(legacy_windows=False)
     help="Filter by namespace (e.g., io.github.user)",
 )
 @click.option(
+    "--sort",
+    type=click.Choice(["name", "version", "recently-updated"]),
+    default="name",
+    help="Sort results",
+)
+@click.option(
     "--refresh",
     is_flag=True,
     help="Refresh registry cache",
@@ -36,6 +41,7 @@ def search(
     query: str,
     limit: int,
     namespace: str,
+    sort: str,
     refresh: bool,
 ):
     """
@@ -138,6 +144,8 @@ def info(server_name: str):
         cpm info io.github.user/mysql
         cpm info mysql                    # Auto-resolves simple name
     """
+
+    from cpm.core.resolver import ServerNameResolver
 
     registry = RegistryClient()
     resolver = ServerNameResolver(registry)

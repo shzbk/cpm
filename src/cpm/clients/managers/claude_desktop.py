@@ -7,7 +7,7 @@ import os
 from typing import Any, Dict
 
 from cpm.clients.base import JSONClientManager
-from cpm.core.schema import RemoteServerConfig, ServerConfig
+from cpm.core.schema import ServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,9 @@ class ClaudeDesktopManager(JSONClientManager):
 
     def to_client_format(self, server_config: ServerConfig) -> Dict[str, Any]:
         """Convert to Claude Desktop format (stdio only currently)"""
-        if isinstance(server_config, RemoteServerConfig):
-            # Claude Desktop doesn't support SSE yet, use stdio proxy
+        # Check if this is a remote server (has url but no command)
+        if hasattr(server_config, 'url') and server_config.url and not (hasattr(server_config, 'command') and server_config.command):
+            # Claude Desktop doesn't support remote servers
             logger.warning(f"Claude Desktop doesn't support remote servers, skipping {server_config.name}")
             return {}
         return super().to_client_format(server_config)
